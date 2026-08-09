@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { PublicProblem } from "@/data/publicProblem";
 import { Language } from "@/data/types";
+import { resolveStarterCode } from "@/data/derived";
 import { useProgressStore } from "@/lib/progressStore";
 import { ResizableSplit } from "./ResizableSplit";
 import { DescriptionPanel } from "./DescriptionPanel";
@@ -30,7 +31,7 @@ export function ProblemWorkspace({ problem }: { problem: PublicProblem }) {
   // Restore saved code (if any) when switching language or on mount.
   useEffect(() => {
     const restored = savedCode?.[language];
-    setCode(restored ?? problem.starterCode[language]);
+    setCode(restored ?? resolveStarterCode(problem, language));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [language]);
 
@@ -40,8 +41,9 @@ export function ProblemWorkspace({ problem }: { problem: PublicProblem }) {
   };
 
   const handleReset = () => {
-    setCode(problem.starterCode[language]);
-    saveCode(problem.slug, language, problem.starterCode[language]);
+    const starter = resolveStarterCode(problem, language);
+    setCode(starter);
+    saveCode(problem.slug, language, starter);
   };
 
   const parseCustomTests = () =>

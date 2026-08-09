@@ -2,15 +2,16 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { Language } from "@/data/types";
 
 export type ProblemStatus = "unattempted" | "attempted" | "solved";
 
 interface ProgressState {
   status: Record<string, ProblemStatus>;
-  savedCode: Record<string, { javascript?: string; python?: string }>;
+  savedCode: Record<string, Partial<Record<Language, string>>>;
   markAttempted: (slug: string) => void;
   markSolved: (slug: string) => void;
-  saveCode: (slug: string, language: "javascript" | "python", code: string) => void;
+  saveCode: (slug: string, language: Language, code: string) => void;
 }
 
 export const useProgressStore = create<ProgressState>()(

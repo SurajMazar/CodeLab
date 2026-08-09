@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getProblemBySlug } from "@/data/problems";
 import { judgeSubmission, runCustomTests } from "@/lib/execute/judge";
-import { Language } from "@/data/types";
+import { EXECUTABLE_LANGUAGES, Language } from "@/data/types";
+import { resolveFunctionName } from "@/data/derived";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -27,7 +28,7 @@ export async function POST(req: NextRequest) {
   if (!slug || !language || typeof code !== "string" || !mode) {
     return NextResponse.json({ error: "Missing slug, language, code, or mode." }, { status: 400 });
   }
-  if (language !== "javascript" && language !== "python") {
+  if (!EXECUTABLE_LANGUAGES.includes(language)) {
     return NextResponse.json({ error: "Unsupported language." }, { status: 400 });
   }
   if (code.length > 20_000) {
@@ -39,7 +40,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Problem not found." }, { status: 404 });
   }
 
-  const functionName = problem.functionName[language];
+  const functionName = resolveFunctionName(problem, language);
 
   try {
     if (mode === "submit") {

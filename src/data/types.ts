@@ -4,7 +4,41 @@
 
 export type Difficulty = "Easy" | "Medium" | "Hard";
 
-export type Language = "javascript" | "python";
+/**
+ * All languages the platform can *display* (editor, starter code, syntax
+ * highlighting). Only `EXECUTABLE_LANGUAGES` can actually Run/Submit today —
+ * see src/lib/execute/README or judge.ts. Adding a new runnable language
+ * means: add a harness builder in harness.ts, a runtime branch in
+ * sandbox.ts, and list it in EXECUTABLE_LANGUAGES below.
+ */
+export type Language =
+  | "javascript"
+  | "typescript"
+  | "python"
+  | "rust"
+  | "cpp"
+  | "c"
+  | "java"
+  | "go"
+  | "kotlin"
+  | "swift"
+  | "csharp";
+
+export const EXECUTABLE_LANGUAGES: readonly Language[] = ["javascript", "typescript", "python"];
+
+export const LANGUAGE_LABELS: Record<Language, string> = {
+  javascript: "JavaScript",
+  typescript: "TypeScript",
+  python: "Python",
+  rust: "Rust",
+  cpp: "C++",
+  c: "C",
+  java: "Java",
+  go: "Go",
+  kotlin: "Kotlin",
+  swift: "Swift",
+  csharp: "C#",
+};
 
 export interface Example {
   input: string;
@@ -28,6 +62,9 @@ export interface TestCase {
 export interface StarterCode {
   javascript: string;
   python: string;
+  /** Optional override; plain JS is valid TS, so this falls back to
+   * `javascript` when omitted (see resolveStarterCode in publicProblem.ts). */
+  typescript?: string;
 }
 
 /** A single visual "frame" a slide can render. Add new variants to extend
@@ -88,11 +125,24 @@ export interface Problem {
   hints: string[];
   /** The candidate function's name differs by language convention
    * (camelCase in JS/TS, snake_case in Python), so it's keyed per language
-   * rather than a single shared string. */
-  functionName: { javascript: string; python: string };
+   * rather than a single shared string. TypeScript falls back to javascript. */
+  functionName: { javascript: string; python: string; typescript?: string };
   paramNames: string[];
   starterCode: StarterCode;
   visibleTests: TestCase[];
   hiddenTests: TestCase[];
   approaches: Approach[];
+  followUp?: string;
+  companies?: string[];
+  relatedSlugs?: string[];
+  prerequisiteSlugs?: string[];
+  /** Rough "expect to spend" guidance shown next to difficulty, e.g. "15-20 min". */
+  estimatedTime?: string;
+  /** Seed stats for the demo (acceptance rate 0-100, submission/solve counts).
+   * This is a frontend-only app with no backend, so these are curated/seeded
+   * numbers rather than live telemetry — see statsFallback in publicProblem.ts
+   * for problems that don't set them explicitly. */
+  acceptanceRate?: number;
+  submissions?: number;
+  solves?: number;
 }

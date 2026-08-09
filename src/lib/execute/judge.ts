@@ -1,7 +1,42 @@
+import ts from "typescript";
 import { buildJsHarness, buildPythonHarness, parseHarnessOutput } from "./harness";
 import { runInSandbox } from "./sandbox";
 import { outputsMatch, CompareMode } from "./compare";
 import { Language, TestCase } from "@/data/types";
+
+/**
+ * TypeScript has no dedicated sandbox runtime — it transpiles to plain JS
+ * (types stripped, no type-checking) and then runs through the exact same
+ * Node harness/sandbox as `javascript`. `ts.transpileModule` only reports
+ * syntax errors, never type errors, which matches how a quick "run my code"
+ * judge is expected to behave (it's not `tsc --noEmit`).
+ */
+function transpileTypescript(code: string): { code: string; error?: string } {
+  const result = ts.transpileModule(code, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+    reportDiagnostics: true,
+  });
+  const errors = (result.diagnostics ?? []).filter((d) => d.category === ts.DiagnosticCategory.Error);
+  if (errors.length > 0) {
+    return { code: "", error: errors.map((d) => ts.flattenDiagnosticMessageText(d.messageText, "\n")).join("\n") };
+  }
+  return { code: result.outputText };
+}
+
+/** Resolves a display Language down to what the sandbox can actually run,
+ * transpiling TypeScript to JS first. Throws-free: compile errors are
+ * returned so callers can report a "Compilation Error" verdict. */
+function prepareForSandbox(
+  language: Language,
+  code: string
+): { language: "javascript" | "python"; code: string; error?: string } {
+  if (language === "typescript") {
+    const { code: transpiled, error } = transpileTypescript(code);
+    return { language: "javascript", code: transpiled, error };
+  }
+  if (language === "javascript" || language === "python") return { language, code };
+  throw new Error(`"${language}" cannot be executed yet.`);
+}
 
 export type Verdict =
   | "Accepted"
@@ -53,13 +88,26 @@ export async function judgeSubmission(params: {
     return { verdict: "Accepted", passed: 0, total: 0, runtimeMs: 0, memoryLabel: "N/A", outcomes: [] };
   }
 
+  const prepared = prepareForSandbox(language, code);
+  if (prepared.error) {
+    return {
+      verdict: "Compilation Error",
+      passed: 0,
+      total: tests.length,
+      runtimeMs: 0,
+      memoryLabel: "N/A",
+      outcomes: [],
+      stderr: prepared.error.slice(0, 4000),
+    };
+  }
+
   const source =
-    language === "javascript"
-      ? buildJsHarness(code, functionName, tests)
-      : buildPythonHarness(code, functionName, tests);
+    prepared.language === "javascript"
+      ? buildJsHarness(prepared.code, functionName, tests)
+      : buildPythonHarness(prepared.code, functionName, tests);
 
   const sandboxResult = await runInSandbox({
-    language,
+    language: prepared.language,
     source,
     timeoutMs: TIMEOUT_MS,
     memoryKB: MEMORY_KB,
@@ -171,12 +219,15 @@ export async function runCustomTests(params: {
   const { language, code, functionName, inputs } = params;
   if (inputs.length === 0) return { outcomes: [] };
 
-  const source =
-    language === "javascript"
-      ? buildJsHarness(code, functionName, inputs.map((i) => ({ input: i })))
-      : buildPythonHarness(code, functionName, inputs.map((i) => ({ input: i })));
+  const prepared = prepareForSandbox(language, code);
+  if (prepared.error) return { outcomes: [], error: prepared.error.slice(0, 4000) };
 
-  const sandboxResult = await runInSandbox({ language, source, timeoutMs: TIMEOUT_MS, memoryKB: MEMORY_KB });
+  const source =
+    prepared.language === "javascript"
+      ? buildJsHarness(prepared.code, functionName, inputs.map((i) => ({ input: i })))
+      : buildPythonHarness(prepared.code, functionName, inputs.map((i) => ({ input: i })));
+
+  const sandboxResult = await runInSandbox({ language: prepared.language, source, timeoutMs: TIMEOUT_MS, memoryKB: MEMORY_KB });
 
   if (sandboxResult.timedOut) return { outcomes: [], timedOut: true, error: "Time limit exceeded." };
 

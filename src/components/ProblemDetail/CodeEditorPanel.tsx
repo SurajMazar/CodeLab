@@ -1,8 +1,9 @@
 "use client";
 
 import Editor, { loader } from "@monaco-editor/react";
-import { Play, Send, Maximize2, Minimize2, RotateCcw } from "lucide-react";
-import { Language } from "@/data/types";
+import { Play, Send, Maximize2, Minimize2, RotateCcw, Clock } from "lucide-react";
+import { Language, LANGUAGE_LABELS } from "@/data/types";
+import { isExecutable, MONACO_LANGUAGE_ID } from "@/data/derived";
 import { useTheme } from "@/components/ThemeProvider";
 
 // Self-host the Monaco assets (copied into /public/monaco/vs at build time,
@@ -10,11 +11,6 @@ import { useTheme } from "@/components/ThemeProvider";
 // the editor working fully offline and avoids a runtime dependency on a
 // third-party script host.
 loader.config({ paths: { vs: "/monaco/vs" } });
-
-const LANGUAGE_LABELS: Record<Language, string> = {
-  javascript: "JavaScript",
-  python: "Python",
-};
 
 export function CodeEditorPanel({
   language,
@@ -42,6 +38,7 @@ export function CodeEditorPanel({
   onReset: () => void;
 }) {
   const { theme } = useTheme();
+  const executable = isExecutable(language);
 
   return (
     <div className="flex h-full flex-col">
@@ -57,6 +54,11 @@ export function CodeEditorPanel({
             </option>
           ))}
         </select>
+        {!executable && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-[var(--surface-muted)] px-2 py-0.5 text-[11px] font-medium text-[var(--foreground)]/60">
+            <Clock size={11} /> Execution coming soon
+          </span>
+        )}
         <div className="flex items-center gap-1.5">
           <button onClick={onReset} title="Reset to starter code" className="rounded p-1.5 hover:bg-[var(--surface-muted)]">
             <RotateCcw size={14} />
@@ -70,7 +72,7 @@ export function CodeEditorPanel({
       <div className="flex-1 overflow-hidden">
         <Editor
           height="100%"
-          language={language === "javascript" ? "javascript" : "python"}
+          language={MONACO_LANGUAGE_ID[language]}
           value={code}
           onChange={(v) => onCodeChange(v ?? "")}
           theme={theme === "dark" ? "vs-dark" : "light"}
@@ -88,14 +90,16 @@ export function CodeEditorPanel({
       <div className="flex items-center justify-end gap-2 border-t border-[var(--border)] px-3 py-2">
         <button
           onClick={onRun}
-          disabled={running || submitting}
+          disabled={running || submitting || !executable}
+          title={executable ? undefined : `${LANGUAGE_LABELS[language]} execution is coming soon`}
           className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border)] px-3 py-1.5 text-sm font-medium hover:bg-[var(--surface-muted)] disabled:opacity-50"
         >
           <Play size={14} /> {running ? "Running..." : "Run"}
         </button>
         <button
           onClick={onSubmit}
-          disabled={running || submitting}
+          disabled={running || submitting || !executable}
+          title={executable ? undefined : `${LANGUAGE_LABELS[language]} execution is coming soon`}
           className="inline-flex items-center gap-1.5 rounded-md bg-[var(--accent)] px-3 py-1.5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
         >
           <Send size={14} /> {submitting ? "Submitting..." : "Submit"}
